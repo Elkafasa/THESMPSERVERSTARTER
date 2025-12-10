@@ -1,7 +1,7 @@
 # Seedloaf MC Server Starter
 Selenium script to automatically start/stop your Seedloaf Minecraft server using GitHub Actions
 
-Completly works online, no download required
+Completely works online, no download required
 
 **⏱️ Setup Time:** 5-10 minutes
 
