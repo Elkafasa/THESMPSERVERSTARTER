@@ -6,6 +6,9 @@ Completely works online, no download required
 **⏱️ Setup Time:** 5-10 minutes
 
 ## ⚠️ Before You Start
+> [!WARNING]
+> I **highly** recommend to create a **2nd seedloaf account** with a role that can only **start**(or stop as per role) the server (check out the roles in seedloaf). This is incase someone gets hold of your github account, all they can do it start(or stop as per role) server.
+
 If you created your Seedloaf account through Discord (not email), you need to do this first or the automation won't work:
 1. Add an email to your Seedloaf account
 2. Unlink Discord from your account
@@ -61,6 +64,7 @@ This thing can be used in two ways. Choose the setup flow you want:
 
 The Discord bot triggers this GitHub thing for you.
 
+[Discord bot source code](https://github.com/dibope/workflowtrigger_bot/tree/main/public%20bot)
 ### Step 1: Fork This Repository
 **Fork** means making your own copy of this thing.
 
