@@ -17,7 +17,7 @@ on:
         description: "start or stop"
         required: false
         default: "true"
-  # This allows Discord/Carl-bot to trigger the script
+  # This allows your Custom Command Bot to trigger the script
   repository_dispatch:
     types: [discord_trigger]
 
@@ -34,12 +34,12 @@ jobs:
           persist-credentials: false
 
       - name: Set Up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('.github/workflows/requirements.txt') }}
@@ -49,8 +49,8 @@ jobs:
       - name: Install Dependencies
         run: pip install -r .github/workflows/requirements.txt
 
-      - name: Install jq
-        run: sudo apt-get install -y jq unzip
+      - name: Install jq and unzip
+        run: sudo apt-get update && sudo apt-get install -y jq unzip
 
       - name: Cache Chrome and ChromeDriver
         id: chrome-cache
@@ -64,7 +64,10 @@ jobs:
       - name: Install Chrome and Driver
         if: steps.chrome-cache.outputs.cache-hit != 'true'
         run: |
+          # Get Latest Stable Chrome Version
           LATEST_VERSION=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.version')
+          
+          # Install Chrome
           CHROME_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${LATEST_VERSION}/linux64/chrome-linux64.zip"
           wget "$CHROME_URL" -O chrome.zip
           unzip -q chrome.zip
@@ -72,6 +75,7 @@ jobs:
           sudo chmod +x /opt/chrome/chrome
           sudo ln -sf /opt/chrome/chrome /usr/bin/google-chrome
 
+          # Install ChromeDriver
           DRIVER_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${LATEST_VERSION}/linux64/chromedriver-linux64.zip"
           wget "$DRIVER_URL" -O chromedriver.zip
           unzip -q chromedriver.zip
@@ -79,15 +83,16 @@ jobs:
           sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
 
       - name: Restore Session Cache
-        if: ${{ inputs.use_session_cache == 'true' }}
+        if: ${{ inputs.use_session_cache == 'true' || github.event_name == 'repository_dispatch' }}
         uses: actions/cache/restore@v4
         with:
           path: /tmp/seedloaf-session
-          key: seedloaf-session-cache-${{ github.run_id }}
-          restore-keys: seedloaf-session-cache-
+          key: seedloaf-session-${{ github.run_id }}
+          restore-keys: |
+            seedloaf-session-
 
       - name: Run Selenium Start Script
-        # Run if start_or_stop is true OR if triggered by Discord Webhook
+        # Run if manual start is true OR if triggered by Discord
         if: ${{ inputs.start_or_stop == 'true' || github.event_name == 'repository_dispatch' }}
         env:
           USERNAME: ${{ secrets.USERNAME }}
@@ -95,7 +100,7 @@ jobs:
         run: python .github/workflows/websitebotex.py
 
       - name: Run Selenium Stop Script
-        if: ${{ inputs.start_or_stop == 'false' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.start_or_stop == 'false' }}
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
@@ -105,12 +110,12 @@ jobs:
         if: always()
         run: |
           curl -H "Content-Type: application/json" \
-          -d "{\"content\": \"🚀 **THE SMP Update**: Selenium script execution finished with status: **${{ job.status }}**!\"}" \
+          -d "{\"content\": \"🚀 **THE SMP Update**: Selenium script execution finished! Status: **${{ job.status }}**\"}" \
           ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Save session cache
-        if: ${{ inputs.use_session_cache == 'true' }}
+        if: ${{ always() && (inputs.use_session_cache == 'true' || github.event_name == 'repository_dispatch') }}
         uses: actions/cache/save@v4
         with:
           path: /tmp/seedloaf-session
-          key: seedloaf-session-cache-${{ github.run_number }}
+          key: seedloaf-session-${{ github.run_id }}
