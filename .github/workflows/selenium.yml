@@ -1,4 +1,4 @@
-name: Run Selenium Script 
+name: Run Selenium Script
 
 on:
   push:
@@ -17,6 +17,9 @@ on:
         description: "start or stop"
         required: false
         default: "true"
+  # This allows Discord/Carl-bot to trigger the script
+  repository_dispatch:
+    types: [discord_trigger]
 
 jobs:
   run-selenium:
@@ -58,16 +61,10 @@ jobs:
             /usr/local/bin/chromedriver
           key: chrome-cache-v1
 
-      - name: Check Chrome and Chrome driver
+      - name: Install Chrome and Driver
         if: steps.chrome-cache.outputs.cache-hit != 'true'
-        id: install-chrome
         run: |
-          # Get Latest Stable Chrome Version
           LATEST_VERSION=$(curl -s https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json | jq -r '.channels.Stable.version')
-          echo "chrome_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "Latest Chrome version: $LATEST_VERSION"
-
-          # Intall Chrome and Chrome driver
           CHROME_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${LATEST_VERSION}/linux64/chrome-linux64.zip"
           wget "$CHROME_URL" -O chrome.zip
           unzip -q chrome.zip
@@ -75,30 +72,23 @@ jobs:
           sudo chmod +x /opt/chrome/chrome
           sudo ln -sf /opt/chrome/chrome /usr/bin/google-chrome
 
-          # Install ChromeDriver to /usr/local/bin
           DRIVER_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${LATEST_VERSION}/linux64/chromedriver-linux64.zip"
           wget "$DRIVER_URL" -O chromedriver.zip
           unzip -q chromedriver.zip
           chmod +x chromedriver-linux64/chromedriver
           sudo mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
 
-      - name: Debug Secrets
-        env:
-          USERNAME: ${{ secrets.USERNAME }}
-        run: echo "USERNAME is $USERNAME"
-
       - name: Restore Session Cache
         if: ${{ inputs.use_session_cache == 'true' }}
-        id: restore-session
         uses: actions/cache/restore@v4
         with:
           path: /tmp/seedloaf-session
           key: seedloaf-session-cache-${{ github.run_id }}
-          restore-keys: |
-            seedloaf-session-cache-
+          restore-keys: seedloaf-session-cache-
 
       - name: Run Selenium Start Script
-        if: ${{ inputs.start_or_stop == 'true' }}
+        # Run if start_or_stop is true OR if triggered by Discord Webhook
+        if: ${{ inputs.start_or_stop == 'true' || github.event_name == 'repository_dispatch' }}
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
@@ -111,20 +101,16 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
         run: python .github/workflows/websitebotstop.py
 
-      - name: Check for new session
-        if: ${{ inputs.use_session_cache == 'true' }}
-        id: session-check
+      - name: Notify Discord
+        if: always()
         run: |
-          if [ -f /tmp/seedloaf-session/.valid_session ]; then
-            echo "valid=true" >> $GITHUB_OUTPUT
-          else
-            echo "valid=false" >> $GITHUB_OUTPUT
-          fi
-      
+          curl -H "Content-Type: application/json" \
+          -d "{\"content\": \"🚀 **THE SMP Update**: Selenium script execution finished with status: **${{ job.status }}**!\"}" \
+          ${{ secrets.DISCORD_WEBHOOK_URL }}
+
       - name: Save session cache
-        if: ${{ inputs.use_session_cache == 'true' && steps.session-check.outputs.valid == 'true' }}
+        if: ${{ inputs.use_session_cache == 'true' }}
         uses: actions/cache/save@v4
-        continue-on-error: true
         with:
           path: /tmp/seedloaf-session
           key: seedloaf-session-cache-${{ github.run_number }}
